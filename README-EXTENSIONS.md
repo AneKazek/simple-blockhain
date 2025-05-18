@@ -16,7 +16,7 @@ The WASM engine allows deploying and executing WebAssembly smart contracts, prov
 - Manage contract lifecycle
 
 **Dependencies:**
-- [wasmer-go](https://github.com/wasmerio/wasmer-go) - WebAssembly runtime for Go
+- [wazero](https://github.com/tetratelabs/wazero) - Zero dependency WebAssembly runtime for Go
 
 ### Lua Engine
 
@@ -124,7 +124,7 @@ http://localhost:9090/metrics
 To install the required dependencies:
 
 ```bash
-go get github.com/wasmerio/wasmer-go/wasmer
+go get github.com/tetratelabs/wazero
 go get github.com/yuin/gopher-lua
 go get github.com/gorilla/mux
 go get github.com/gorilla/websocket

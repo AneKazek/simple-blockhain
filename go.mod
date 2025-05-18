@@ -10,8 +10,10 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/prometheus/client_golang v1.22.0
 	github.com/syndtr/goleveldb v1.0.0
-	github.com/wasmerio/wasmer-go v1.0.4
+	github.com/tetratelabs/wazero v1.5.0
 )
+
+require github.com/yuin/gopher-lua v1.1.1
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -20,7 +22,6 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/yuin/gopher-lua v1.1.1 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 )
