@@ -441,7 +441,7 @@ func (s *EnhancedBlockchainServer) handleExecuteContract(w http.ResponseWriter, 
 	}
 
 	// Try to execute WASM contract
-	wasmContract, err1 := s.wasmEngine.GetContract(id)
+	_, err1 := s.wasmEngine.GetContract(id)
 	if err1 == nil {
 		result, err := s.wasmEngine.ExecuteContract(id, execData.Function, execData.Params...)
 		if err != nil {
