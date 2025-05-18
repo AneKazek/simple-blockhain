@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockchain Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            font-weight: bold;
+            background-color: #f1f8ff;
+        }
+        .stats-card {
+            text-align: center;
+            padding: 15px;
+        }
+        .stats-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .stats-label {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .transaction-item {
+            border-left: 4px solid #0d6efd;
+            padding-left: 10px;
+            margin-bottom: 10px;
+        }
+        .block-item {
+            border-left: 4px solid #198754;
+            padding-left: 10px;
+            margin-bottom: 10px;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Blockchain Dashboard</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-value" id="block-count">0</div>
+                    <div class="stats-label">Blocks</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-value" id="tx-count">0</div>
+                    <div class="stats-label">Transactions</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-value" id="peer-count">0</div>
+                    <div class="stats-label">Peers</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="stats-value" id="node-status">Healthy</div>
+                    <div class="stats-label">Node Status</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Latest Blocks</div>
+                    <div class="card-body">
+                        <div id="blocks-container"></div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">Create Transaction</div>
+                    <div class="card-body">
+                        <form id="tx-form">
+                            <div class="mb-3">
+                                <label for="tx-from" class="form-label">From</label>
+                                <input type="text" class="form-control" id="tx-from" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tx-to" class="form-label">To</label>
+                                <input type="text" class="form-control" id="tx-to" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tx-value" class="form-label">Value</label>
+                                <input type="number" class="form-control" id="tx-value" step="0.01" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tx-data" class="form-label">Data</label>
+                                <textarea class="form-control" id="tx-data" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit Transaction</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Pending Transactions</div>
+                    <div class="card-body">
+                        <div id="transactions-container"></div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">Smart Contracts</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="contract-type" class="form-label">Contract Type</label>
+                            <select class="form-select" id="contract-type">
+                                <option value="wasm">WebAssembly</option>
+                                <option value="lua">Lua</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="contract-name" class="form-label">Contract Name</label>
+                            <input type="text" class="form-control" id="contract-name">
+                        </div>
+                        <div class="mb-3">
+                            <label for="contract-code" class="form-label">Contract Code</label>
+                            <textarea class="form-control" id="contract-code" rows="5"></textarea>
+                        </div>
+                        <button id="deploy-contract" class="btn btn-success">Deploy Contract</button>
+                        
+                        <hr>
+                        <h5>Deployed Contracts</h5>
+                        <div id="contracts-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-container" class="notification"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // WebSocket connection
+        let ws;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.hostname}:8081/ws`);
+            
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+                showNotification('Connected to blockchain node', 'success');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Received data:', data);
+                
+                if (data.type === 'stats') {
+                    updateStats(data);
+                } else if (data.type === 'new_block') {
+                    addBlock(data.block);
+                    showNotification('New block added to the chain', 'info');
+                } else if (data.type === 'new_transaction') {
+                    addTransaction(data.transaction);
+                    showNotification('New transaction received', 'info');
+                } else if (data.type === 'contract_deployed') {
+                    addContract(data.contract);
+                    showNotification('Smart contract deployed', 'success');
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    setTimeout(connectWebSocket, 3000 * reconnectAttempts);
+                    showNotification('Connection lost. Reconnecting...', 'warning');
+                } else {
+                    showNotification('Failed to connect to blockchain node', 'danger');
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Update dashboard stats
+        function updateStats(data) {
+            document.getElementById('block-count').textContent = data.blockCount;
+            document.getElementById('tx-count').textContent = data.transactionCount;
+            document.getElementById('peer-count').textContent = data.peerCount;
+            
+            const nodeStatus = document.getElementById('node-status');
+            if (data.nodeHealthy) {
+                nodeStatus.textContent = 'Healthy';
+                nodeStatus.style.color = '#198754';
+            } else {
+                nodeStatus.textContent = 'Unhealthy';
+                nodeStatus.style.color = '#dc3545';
+            }
+        }
+
+        // Add a new block to the UI
+        function addBlock(block) {
+            const blocksContainer = document.getElementById('blocks-container');
+            const blockElement = document.createElement('div');
+            blockElement.className = 'block-item';
+            blockElement.innerHTML = `
+                <p><strong>Block #${block.index}</strong> - Hash: ${block.hash.substring(0, 10)}...</p>
+                <p>Transactions: ${block.transactions.length} | Timestamp: ${new Date(block.timestamp).toLocaleString()}</p>
+            `;
+            
+            // Add to the beginning of the list
+            blocksContainer.insertBefore(blockElement, blocksContainer.firstChild);
+            
+            // Limit the number of displayed blocks
+            if (blocksContainer.children.length > 5) {
+                blocksContainer.removeChild(blocksContainer.lastChild);
+            }
+        }
+
+        // Add a new transaction to the UI
+        function addTransaction(tx) {
+            const txContainer = document.getElementById('transactions-container');
+            const txElement = document.createElement('div');
+            txElement.className = 'transaction-item';
+            txElement.innerHTML = `
+                <p><strong>TX ID:</strong> ${tx.id.substring(0, 10)}...</p>
+                <p><strong>From:</strong> ${tx.from.substring(0, 15)}... <strong>To:</strong> ${tx.to.substring(0, 15)}...</p>
+                <p><strong>Value:</strong> ${tx.value} | <strong>Time:</strong> ${new Date(tx.timestamp).toLocaleString()}</p>
+            `;
+            
+            // Add to the beginning of the list
+            txContainer.insertBefore(txElement, txContainer.firstChild);
+            
+            // Limit the number of displayed transactions
+            if (txContainer.children.length > 5) {
+                txContainer.removeChild(txContainer.lastChild);
+            }
+        }
+
+        // Add a contract to the UI
+        function addContract(contract) {
+            const contractsContainer = document.getElementById('contracts-container');
+            const contractElement = document.createElement('div');
+            contractElement.className = 'mb-3 p-2 border rounded';
+            contractElement.innerHTML = `
+                <p><strong>${contract.name}</strong> (${contract.type})</p>
+                <p><small>ID: ${contract.id}</small></p>
+                <button class="btn btn-sm btn-primary execute-contract" data-id="${contract.id}">Execute</button>
+            `;
+            
+            contractsContainer.appendChild(contractElement);
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const container = document.getElementById('notification-container');
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${type} alert-dismissible fade show`;
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            container.appendChild(notification);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+
+        // Form submission handlers
+        document.getElementById('tx-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const transaction = {
+                from: document.getElementById('tx-from').value,
+                to: document.getElementById('tx-to').value,
+                value: parseFloat(document.getElementById('tx-value').value),
+                data: document.getElementById('tx-data').value
+            };
+            
+            // Send transaction to the server
+            fetch('/api/transactions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(transaction)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('Transaction submitted successfully', 'success');
+                document.getElementById('tx-form').reset();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Failed to submit transaction', 'danger');
+            });
+        });
+
+        document.getElementById('deploy-contract').addEventListener('click', function() {
+            const contractData = {
+                type: document.getElementById('contract-type').value,
+                name: document.getElementById('contract-name').value,
+                code: document.getElementById('contract-code').value
+            };
+            
+            // Send contract to the server
+            fetch('/api/contracts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(contractData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('Contract deployed successfully', 'success');
+                document.getElementById('contract-name').value = '';
+                document.getElementById('contract-code').value = '';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Failed to deploy contract', 'danger');
+            });
+        });
+
+        // Initialize WebSocket connection
+        connectWebSocket();
+
+        // Load initial data
+        fetch('/api/blockchain')
+            .then(response => response.json())
+            .then(data => {
+                // Display the latest blocks
+                data.blocks.slice(0, 5).reverse().forEach(block => {
+                    addBlock(block);
+                });
+            })
+            .catch(error => console.error('Error loading blockchain data:', error));
+
+        fetch('/api/transactions/pending')
+            .then(response => response.json())
+            .then(data => {
+                // Display pending transactions
+                data.transactions.slice(0, 5).forEach(tx => {
+                    addTransaction(tx);
+                });
+            })
+            .catch(error => console.error('Error loading transaction data:', error));
+
+        fetch('/api/contracts')
+            .then(response => response.json())
+            .then(data => {
+                // Display contracts
+                data.contracts.forEach(contract => {
+                    addContract(contract);
+                });
+            })
+            .catch(error => console.error('Error loading contract data:', error));
+    </script>
+</body>
+</html>
