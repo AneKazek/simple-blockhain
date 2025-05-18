@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	lua "github.com/yuin/gopher-lua"
 )
 
 // LuaEngine provides Lua-based smart contract execution
